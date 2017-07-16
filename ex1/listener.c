@@ -14,6 +14,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 
 #define HELLO_PORT 12345
@@ -22,7 +23,8 @@
 
 int main(int argc, char *argv[]) {
   struct sockaddr_in addr;
-  int fd, nbytes, addrlen;
+  int fd, nbytes;
+  socklen_t addrlen;
   struct ip_mreq mreq;
   char msgbuf[MSGBUFSIZE];
 
