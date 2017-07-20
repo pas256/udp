@@ -50,7 +50,7 @@ int main()
   if ( status < 0 ) {
     perror("Error binding socket to interface"), exit(0);
   }
-  
+
   imreq.imr_multiaddr.s_addr = inet_addr(MCAST_GROUP);
   imreq.imr_interface.s_addr = INADDR_ANY; // use DEFAULT interface
 
@@ -63,10 +63,17 @@ int main()
   printf("Listening on %s:%d\n", MCAST_GROUP, MCAST_PORT);
 
   // receive packet from socket
-  status = recvfrom(sock, buffer, MAXBUFSIZE, 0,
-              (struct sockaddr *)&saddr, &socklen);
+  while (1) {
+    status = recvfrom(sock, buffer, MAXBUFSIZE, 0,
+                (struct sockaddr *)&saddr, &socklen);
 
-  printf("%s", buffer);
+    if (status < 0) {
+      perror("recvfrom");
+      return 1;
+    }
+
+    printf("%s\n", buffer);
+  }
 
   // shutdown socket
   shutdown(sock, 2);
