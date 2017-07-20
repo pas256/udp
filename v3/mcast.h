@@ -1,2 +1,3 @@
-#define MCAST_GROUP "226.0.0.1"
+// #define MCAST_GROUP "226.0.0.1"
+#define MCAST_GROUP "172.16.0.99"
 #define MCAST_PORT 9990

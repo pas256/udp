@@ -49,8 +49,8 @@ int main()
   if ( status < 0 )
     perror("Error binding socket to interface"), exit(0);
 
-  // iaddr.s_addr = INADDR_ANY; // use DEFAULT interface
-  iaddr.s_addr = inet_addr("172.16.0.4");
+  iaddr.s_addr = INADDR_ANY; // use DEFAULT interface
+  // iaddr.s_addr = inet_addr("172.16.0.1");
 
   // Set the outgoing interface to DEFAULT
   setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &iaddr,
