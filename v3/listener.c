@@ -53,7 +53,7 @@ int main()
 
   imreq.imr_multiaddr.s_addr = inet_addr(MCAST_GROUP);
   // imreq.imr_interface.s_addr = INADDR_ANY; // use DEFAULT interface
-  imreq.imr_interface.s_addr = inet_addr("172.16.0.4");
+  imreq.imr_interface.s_addr = inet_addr("172.16.0.1");
 
   // JOIN multicast group on default interface
   status = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
