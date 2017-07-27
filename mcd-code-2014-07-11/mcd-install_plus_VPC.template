@@ -1,0 +1,440 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09", 
+  "Description" : "MCD Installation: This template automates overlay multicast using GRE by installing a utility called MCD.  After successfully launching this CloudFormation stack, you will have a VPC and two instances with MCD and omping installed.",
+  "Mappings": {
+    "RegionMap": {
+      "ap-northeast-1": {
+        "AMI": "ami-e74b60e6"
+      }, 
+      "ap-southeast-1": {
+        "AMI": "ami-d6e7c084"
+      }, 
+      "ap-southeast-2": {
+        "AMI": "ami-1711732d"
+      }, 
+      "eu-central-1": {
+        "AMI": "ami-b83c0aa5"
+      }, 
+      "eu-west-1": {
+        "AMI": "ami-f0b11187"
+      }, 
+      "sa-east-1": {
+        "AMI": "ami-69d26774"
+      }, 
+      "us-east-1": {
+        "AMI": "ami-9eaa1cf6"
+      }, 
+      "us-west-1": {
+        "AMI": "ami-076e6542"
+      }, 
+      "us-west-2": {
+        "AMI": "ami-3d50120d"
+      }
+    }
+  }, 
+  "Outputs": {
+    "Ec2InstanceName1": {
+      "Description": "The name of the first EC2 Instance ", 
+      "Value": { "Fn::GetAtt" : [ "Ec2Instance1", "PublicDnsName" ]}
+      
+    }, 
+    "Ec2InstanceName2": {
+      "Description": "The name of the first EC2 Instance ", 
+      "Value": { "Fn::GetAtt" : [ "Ec2Instance2", "PublicDnsName" ]}
+    }, 
+    "IAMRoleName": {
+      "Description": "The name of the created IAMRole", 
+      "Value": {
+        "Ref": "IAMRole"
+      }
+    }, 
+    "SecurityGroupName": {
+      "Description": "The name of the created Instance Security Group", 
+      "Value": {
+        "Ref": "MulticastSecurityGroup"
+      }
+    }
+  }, 
+  "Parameters": {
+    "EC2Name1": {
+      "Default": "MCast01", 
+      "Description": "Provide a name for the first EC2 Instance", 
+      "Type": "String"
+    }, 
+    "EC2Name2": {
+      "Default": "MCast02", 
+      "Description": "Provide a name for the second EC2 Instance", 
+      "Type": "String"
+    }, 
+    "InstanceTypeParameter": {
+      "AllowedValues": [
+        "t2.micro", 
+        "t2.small", 
+        "t2.medium", 
+        "m3.medium", 
+        "m3.large", 
+        "m3.xlarge", 
+        "m3.2xlarge", 
+        "c3.large", 
+        "c3.xlarge", 
+        "c3.2xlarge"
+      ], 
+      "Default": "t2.micro", 
+      "Description": "Enter t2.small, t2.medium, m3.medium, m3.large, m3.xlarge, m3.2xlarge, c3.large, c3.xlarge, or c3.2xlarge. Default is t2.micro.", 
+      "Type": "String"
+    }, 
+    "KeyName": {
+      "Description": "Provide an existing Key Pair", 
+      "Type": "String"
+    }, 
+    "VpcCidr": {
+      "Default": "10.100.0.0/16", 
+      "Description": "'Community-Name/CIDR' for first EC2 instance. Community-Name must be 5 characters or less.", 
+      "Type": "String"
+    },
+    "SubnetCidr": {
+      "Default": "10.100.0.0/24", 
+      "Description": "'Community-Name/CIDR' for first EC2 instance. Community-Name must be 5 characters or less.", 
+      "Type": "String"
+    },
+    "MulticastIP1": {
+      "Default": "app1,192.168.0.10/24", 
+      "Description": "'Community-Name/CIDR' for first EC2 instance. Community-Name must be 5 characters or less.", 
+      "Type": "String"
+    },
+    "MulticastIP2": {
+      "Default": "app1,192.168.0.11/24", 
+      "Description": "'Community-Name/CIDR' for second EC2 instance. Community-Name must be 5 characters or less.", 
+      "Type": "String"
+    }
+  }, 
+  "Resources": {
+    "VPC" : {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "CidrBlock" : { "Ref" : "VpcCidr" },
+        "EnableDnsSupport" : "true",
+        "EnableDnsHostnames" : "true",
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Multicast" },
+          { "Key" : "Name", "Value" : "Multicast Demo" }
+        ]
+      }
+    },
+
+    "PubSubnet" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : { "Ref" : "SubnetCidr" },
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Multicast" },
+          { "Key" : "Name", "Value" : "Multicast Demo" }
+        ]
+      }
+    },
+    "InternetGateway" : {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Multicast" },
+          { "Key" : "Name", "Value" : "Multicast Demo" }
+        ]
+      }
+    },
+
+    "GatewayToInternet" : {
+       "Type" : "AWS::EC2::VPCGatewayAttachment",
+       "Properties" : {
+         "VpcId" : { "Ref" : "VPC" },
+         "InternetGatewayId" : { "Ref" : "InternetGateway" }
+       }
+    },
+
+    "PublicRouteTable" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Multicast" },
+          { "Key" : "Network", "Value" : "Multicast Demo" }
+        ]
+      }
+    },
+    "PublicRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PublicRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "InternetGateway" }
+      }
+    },
+
+    "PubSubnetRTAssoc" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PubSubnet" },
+        "RouteTableId" : { "Ref" : "PublicRouteTable" }
+      }
+    },
+
+    "Ec2Instance1": {
+      "Properties": {
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        }, 
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionMap", 
+            {
+              "Ref": "AWS::Region"
+            }, 
+            "AMI"
+          ]
+        }, 
+        "InstanceType": {
+          "Ref": "InstanceTypeParameter"
+        }, 
+        "KeyName": {
+          "Ref": "KeyName"
+        }, 
+	"NetworkInterfaces": [{
+	    "AssociatePublicIpAddress" : "true",
+	    "DeviceIndex": "0",
+            "GroupSet" : [{ "Ref" : "MulticastSecurityGroup" }],
+            "SubnetId" : { "Ref" : "PubSubnet" }
+	}],
+        "Tags": [
+          {
+            "Key": "Name", 
+            "Value": {
+              "Ref": "EC2Name1"
+            }
+          }, 
+          {
+            "Key": "multicast", 
+            "Value": {
+              "Ref": "MulticastIP1"
+            }
+          }
+        ], 
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", 
+              [
+                "#!/bin/bash -ex\n", 
+                "set -e -x\n", 
+                "export LC_CTYPE=en_US.UTF-8\n", 
+                "export LANG=en_US.UTF-8\n", 
+                "unset LC_ALL\n", 
+                "apt-get update\n", 
+                "apt-get update --fix-missing\n", 
+                "apt-get -y install libxslt1.1 ruby1.9.1-dev ruby1.9.1-full make\n", 
+                "#apt-get -y install libxslt1.1\n", 
+                "#apt-get -y install ruby1.9.1-dev\n", 
+                "#apt-get -y install ruby1.9.1-full\n", 
+                "#apt-get update --fix-missing\n", 
+                "#apt-get install make\n", 
+                "apt-get -y install rubygems-integration bridge-utils ebtables\n", 
+                "apt-get -y install curl\n", 
+                "gem1.9.1 install daemons\n", 
+                "gem1.9.1 install aws-sdk\n", 
+                "cd /home/ubuntu\n", 
+                "wget https://fedorahosted.org/releases/o/m/omping/omping-0.0.4.tar.gz\n", 
+                "tar -zxf omping-0.0.4.tar.gz\n", 
+                "cd omping-0.0.4\n", 
+                "make\n", 
+                "mkdir -p /opt/mcast\n", 
+                "chown -R root:root /opt/mcast\n", 
+                "cd /home/ubuntu\n", 
+                "wget https://s3.amazonaws.com/reinvent-mcd-test/mcd-code-2014-07-11.zip\n", 
+                "apt-get -y install unzip\n", 
+                "unzip mcd-code-2014-07-11.zip\n", 
+                "mv /home/ubuntu/mcd-code-2014-07-11/mcd.conf /etc/init\n", 
+                "chmod 755 /home/ubuntu/mcd-code-2014-07-11/mcd*\n", 
+                "mv /home/ubuntu/mcd-code-2014-07-11/* /opt/mcast\n", 
+                "start mcd\n"
+              ]
+            ]
+          }
+        }
+      }, 
+      "Type": "AWS::EC2::Instance"
+    }, 
+    "Ec2Instance2": {
+      "Properties": {
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        }, 
+        "ImageId": {
+          "Fn::FindInMap": [
+            "RegionMap", 
+            {
+              "Ref": "AWS::Region"
+            }, 
+            "AMI"
+          ]
+        }, 
+        "InstanceType": {
+          "Ref": "InstanceTypeParameter"
+        }, 
+        "KeyName": {
+          "Ref": "KeyName"
+        }, 
+	"NetworkInterfaces": [{
+	    "AssociatePublicIpAddress" : "true",
+	    "DeviceIndex": "0",
+            "GroupSet" : [{ "Ref" : "MulticastSecurityGroup" }],
+            "SubnetId" : { "Ref" : "PubSubnet" }
+	}],
+        "Tags": [
+          {
+            "Key": "Name", 
+            "Value": {
+              "Ref": "EC2Name2"
+            }
+          }, 
+          {
+            "Key": "multicast", 
+            "Value": {
+              "Ref": "MulticastIP2"
+            }
+          }
+        ], 
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", 
+              [
+                "#!/bin/bash -ex\n", 
+                "set -e -x\n", 
+                "export LC_CTYPE=en_US.UTF-8\n", 
+                "export LANG=en_US.UTF-8\n", 
+                "unset LC_ALL\n", 
+                "apt-get update\n", 
+                "apt-get update --fix-missing\n", 
+                "apt-get -y install libxslt1.1 ruby1.9.1-dev ruby1.9.1-full make\n", 
+                "#apt-get -y install libxslt1.1\n", 
+                "#apt-get -y install ruby1.9.1-dev\n", 
+                "#apt-get -y install ruby1.9.1-full\n", 
+                "#apt-get update --fix-missing\n", 
+                "#apt-get install make\n", 
+                "apt-get -y install rubygems-integration bridge-utils ebtables\n", 
+                "apt-get -y install curl\n", 
+                "gem1.9.1 install daemons\n", 
+                "gem1.9.1 install aws-sdk\n", 
+                "cd /home/ubuntu\n", 
+                "wget https://fedorahosted.org/releases/o/m/omping/omping-0.0.4.tar.gz\n", 
+                "tar -zxf omping-0.0.4.tar.gz\n", 
+                "cd omping-0.0.4\n", 
+                "make\n", 
+                "mkdir -p /opt/mcast\n", 
+                "chown -R root:root /opt/mcast\n", 
+                "cd /home/ubuntu\n", 
+                "wget https://s3.amazonaws.com/reinvent-mcd-test/mcd-code-2014-07-11.zip\n", 
+                "apt-get -y install unzip\n", 
+                "unzip mcd-code-2014-07-11.zip\n", 
+                "mv /home/ubuntu/mcd-code-2014-07-11/mcd.conf /etc/init\n", 
+                "chmod 755 /home/ubuntu/mcd-code-2014-07-11/mcd*\n", 
+                "mv /home/ubuntu/mcd-code-2014-07-11/* /opt/mcast\n", 
+                "start mcd\n"              ]
+            ]
+          }
+        }
+      }, 
+      "Type": "AWS::EC2::Instance"
+    }, 
+    "IAMRole": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sts:AssumeRole"
+              ], 
+              "Effect": "Allow", 
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              }
+            }
+          ], 
+          "Version": "2012-10-17"
+        }, 
+        "Path": "/", 
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+		  "Action": [
+	          	"ec2:DescribeInstances",
+        	  	"ec2:DescribeTags",
+        	  	"ec2:DescribeRegions"
+		  ],
+                  "Effect": "Allow", 
+                  "Resource": "*"
+                } 
+              ], 
+              "Version": "2012-10-17"
+            }, 
+            "PolicyName": "EC2policy"
+          }
+        ]
+      }, 
+      "Type": "AWS::IAM::Role"
+    }, 
+    "InstanceProfile": {
+      "Properties": {
+        "Path": "/", 
+        "Roles": [
+          {
+            "Ref": "IAMRole"
+          }
+        ]
+      }, 
+      "Type": "AWS::IAM::InstanceProfile"
+    }, 
+    "MulticastSecurityGroup": {
+      "Properties": {
+        "GroupDescription": "Enable Access for GRE Protocol and SSH access via port 22", 
+	"VpcId": { "Ref" : "VPC" },
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0", 
+            "FromPort": "22", 
+            "IpProtocol": "tcp", 
+            "ToPort": "22"
+          } 
+        ]
+      }, 
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "AllowGRE": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "47",
+        "FromPort": "0",
+        "ToPort": "65535",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "MulticastSecurityGroup",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "MulticastSecurityGroup",
+            "GroupId"
+          ]
+        }
+      }
+    }
+  }
+}

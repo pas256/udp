@@ -1,0 +1,94 @@
+#! /usr/bin/ruby1.9.1
+
+require 'syslog'
+require 'rubygems'
+require 'aws-sdk'
+require 'daemons'
+
+$:.unshift('/opt/mcast')
+require 'bridge-gre'
+require 'mcast-communities'
+
+Daemons.daemonize({:app_name => 'mcd', :backtrace => true,
+                   :log_output => true, :log_dir => '/opt/mcast',
+                   :ontop => true})
+
+Syslog.open("mcd", Syslog::LOG_PID, Syslog::LOG_DAEMON)
+
+class ThisInstance
+
+   def self.main_private_ip
+      return @@main_private_ip if defined? @@main_private_ip
+      @@main_private_ip ||= `curl -s http://169.254.169.254/latest/meta-data/local-ipv4`
+   end
+
+   def self.instance_id
+      return @@instance_id if defined? @@instance_id
+      @@instance_id ||= `curl -s http://169.254.169.254/latest/meta-data/instance-id`
+   end
+
+   def self.az
+      return @@az if defined? @@az
+      @@az ||= `curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone`
+   end
+
+   def self.region
+      ThisInstance.az.gsub(/.$/, '')
+   end
+end
+
+def note(msg)
+   Syslog.log(Syslog::LOG_NOTICE, msg)
+end
+
+note("Starting up. My instance ID: #{ThisInstance.instance_id} in AZ #{ThisInstance.az}")
+
+def update_own_communities(ec2, mc)
+   configured = MulticastCommunity.this_instance_community(ec2)
+   configured.each { |c|
+      if (!mc.has_key?(c.community))
+         # Need to add this community
+         mc[c.community] = c
+         c.bridge_create
+      end
+   }
+   mc.each_key { |k|
+      if (configured.select { |c| c.community == k }.count == 0)
+         # Need to delete this community
+         mc[k].bridge_delete
+         mc.delete(k)
+      end
+   }
+end
+
+def update_communities(ec2, mc)
+   note("Found #{ec2.instances.count} instances")
+   comm_membership = Hash.new
+
+   ec2.instances.each { |i|
+      next if (i.instance_id == ThisInstance.instance_id)
+      next unless (i.status == :running)
+      comms = MulticastCommunity.tag_parse(i.tags)
+      comms.each { |c|
+         note("Instance #{i.instance_id} is in multicast community #{c.community}")
+         next unless (mc.has_key?(c.community))
+         comm_membership[c.community] ||= {}
+         comm_membership[c.community][i.instance_id] = i
+      }
+   }
+
+   comm_membership.each { |cname, instances|
+      mc[cname].sync_membership(instances)
+   }
+end
+
+ec2 = AWS::EC2.new.regions[ThisInstance.region]
+
+mcast_communities = Hash.new
+
+loop do
+   update_own_communities(ec2, mcast_communities)
+   update_communities(ec2, mcast_communities)
+
+   sleep(60)
+end

@@ -1,0 +1,39 @@
+brctl addbr mcbr-foo
+ebtables -P FORWARD DROP
+ip addr add 172.16.0.3/24 dev mcbr-foo
+ip link set mcbr-foo up
+
+ip link add gretap-to-2 type gretap local 10.22.12.30 remote 10.22.30.214
+ip link set dev gretap-to-2 up
+brctl addif mcbr-foo gretap-to-2
+ip link add gretap-to-3 type gretap local 10.22.12.30 remote 10.22.39.217
+ip link set dev gretap-to-3 up
+brctl addif mcbr-foo gretap-to-3
+
+
+
+brctl addbr mcbr-foo
+ebtables -P FORWARD DROP
+ip addr add 172.16.0.4/24 dev mcbr-foo
+ip link set mcbr-foo up
+
+ip link add gretap-to-1 type gretap local 10.22.30.214 remote 10.22.12.30
+ip link set dev gretap-to-1 up
+brctl addif mcbr-foo gretap-to-1
+ip link add gretap-to-3 type gretap local 10.22.30.214 remote 10.22.39.217
+ip link set dev gretap-to-3 up
+brctl addif mcbr-foo gretap-to-3
+
+
+
+brctl addbr mcbr-foo
+ebtables -P FORWARD DROP
+ip addr add 172.16.0.5/24 dev mcbr-foo
+ip link set mcbr-foo up
+
+ip link add gretap-to-1 type gretap local 10.22.39.217 remote 10.22.12.30
+ip link set dev gretap-to-1 up
+brctl addif mcbr-foo gretap-to-1
+ip link add gretap-to-2 type gretap local 10.22.39.217 remote 10.22.30.214
+ip link set dev gretap-to-2 up
+brctl addif mcbr-foo gretap-to-2
